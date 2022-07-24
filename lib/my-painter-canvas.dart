@@ -3,11 +3,33 @@ import 'dart:math';
 import 'package:flocking/particle.dart';
 import 'package:flutter/material.dart';
 
+import 'direction-decision.dart';
+
+double eyesight = 25000;
+double crowd = 250;
+double theta_coefficient = 100;
+double seperation_coefficient = 15;
+double alignment_coefficient = 100;
+double cohesion_coefficient = 10;
+
 Offset PolarToCartestian(double speed, double theta) {
   return Offset(speed * cos(theta), speed * sin(theta));
 }
+Offset PolarToCartestian2(double speed, double seperation, double alignment, double cohesion, double theta){
+  Offset factor = Offset(seperation_coefficient*cos(seperation)
+      + alignment_coefficient*cos(alignment)
+      + cohesion_coefficient*cos(cohesion)
+      + theta_coefficient*cos(theta),
+      seperation_coefficient*sin(seperation)
+      + alignment_coefficient*sin(alignment)
+      + cohesion_coefficient*sin(cohesion)
+      + theta_coefficient*sin(theta));
 
-double eyesight = 25000;
+  return Offset(speed*factor.dx/(seperation_coefficient+alignment_coefficient+cohesion_coefficient+theta_coefficient)
+  ,speed*factor.dy/(seperation_coefficient+alignment_coefficient+cohesion_coefficient+theta_coefficient));
+}
+
+
 
 class MyPainterCanvas extends CustomPainter {
   List<Particle> particles;
@@ -19,38 +41,67 @@ class MyPainterCanvas extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     // update the objects
     this.particles.forEach((p){
-      var cnt = 0;
-      var temp_position = Offset(0.0,0.0);
-      Offset position = Offset(p.position.dx-size.width/2,size.height/2 - p.position.dy);
+      //direction decision part
+      var cohesion_cnt = 0;
+      var seperation_cnt = 0;
+      var alignment_cnt = 0;
+      var cohesion_position = Offset(0.0, 0.0);
+      var seperation_position = Offset(0.0, 0.0);
+      var alignment_theta = 0.0;
+      Offset position = Offset(p.position.dx - size.width / 2, size.height / 2 - p.position.dy);
+
       for (var val in this.particles) {
-        var distance = (val.position.dx-p.position.dx)*(val.position.dx-p.position.dx)+
-            (val.position.dy-p.position.dy)*(val.position.dy-p.position.dy);
+        Offset val_position = Offset(val.position.dx - size.width / 2, size.height/2 - val.position.dy);
+        double distance = (val_position.dx-position.dx)*(val_position.dx-position.dx)+
+            (val_position.dy-position.dy)*(val_position.dy-position.dy);
         if (distance > 0 && distance < eyesight) {
-          Offset reposition = Offset(val.position.dx-size.width/2, size.height/2 - val.position.dy);
-          temp_position += reposition;
-          cnt++;
+          cohesion_position += val_position;
+          cohesion_cnt++;
+          alignment_theta += val.theta;
+          alignment_cnt++;
+        }
+        if (distance > 0 && distance < crowd){
+          seperation_position += val_position;
+          seperation_cnt++;
+          //seperation_coefficient += 1/(sqrt(distance)*20);
         }
       }
-      temp_position = Offset(temp_position.dx/cnt, temp_position.dy/cnt);
-
-      if (cnt >0) {
-          p.theta = atan2(-(temp_position.dy-position.dy),(temp_position.dx-position.dx));
-
+      if (cohesion_cnt > 0) {
+        cohesion_position = Offset(cohesion_position.dx / cohesion_cnt,
+            cohesion_position.dy / cohesion_cnt);
       }
+      if (seperation_cnt > 0){
+        seperation_position = Offset(seperation_position.dx/seperation_cnt,
+            seperation_position.dy/seperation_cnt);
+      }
+      if (alignment_cnt > 0){
+        alignment_theta = alignment_theta/alignment_cnt;
+      }
+      var cohesion_theta = atan2(-(cohesion_position.dy - position.dy),
+          (cohesion_position.dx - position.dx));
+      var seperation_theta = atan2(seperation_position.dy - position.dy,
+          seperation_position.dx - position.dx);
+
       var velocity = PolarToCartestian(p.speed, p.theta);
+      if (cohesion_cnt > 0 || seperation_cnt > 0 || alignment_cnt >0) {
+        velocity = PolarToCartestian2(p.speed, seperation_theta, alignment_theta, cohesion_theta, p.theta);
+        p.theta = atan2(velocity.dy, velocity.dx);
+      }
+
+      //moving part
       var dx = p.position.dx + velocity.dx;
       var dy = p.position.dy + velocity.dy;
       if (p.position.dx < 0){
-        dx = size.width-10;
+        dx = size.width;
       }
       else if (p.position.dx > size.width){
-        dx = 10;
+        dx = 0;
       }
       if (p.position.dy < 0){
-        dy = size.height-10;
+        dy = size.height;
       }
       else if (p.position.dy > size.height){
-        dy = 10;
+        dy = 0;
       }
       p.position = Offset(dx,dy);
     });
@@ -65,8 +116,9 @@ class MyPainterCanvas extends CustomPainter {
       paint3.color  = Colors.blue;
       var line_factor = Offset(p.position.dx+cos(p.theta)*line_length, p.position.dy+sin(p.theta)*line_length);
       canvas.drawCircle(p.position, p.radius, paint);
-      canvas.drawCircle(p.position, sqrt(eyesight), paint2);
-      canvas.drawLine(p.position, line_factor, paint3);
+      //canvas.drawCircle(p.position, sqrt(eyesight), paint2);
+      //canvas.drawCircle(p.position,sqrt(crowd),paint2);
+      //canvas.drawLine(p.position, line_factor, paint3);
     });
     /*
     var dx = size.width/2;

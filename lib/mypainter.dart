@@ -24,8 +24,8 @@ Color getRandomColor(Random rgn){
 double maxRadius = 5;
 double maxSpeed = 1;
 double maxTheta = 2.0 * pi;
-int maxwidth = 1000;
-int maxheight = 3000;
+int maxwidth = 5000;
+int maxheight = 5000;
 
 class _MyPainterState extends State<MyPainter>
     with SingleTickerProviderStateMixin{
@@ -56,7 +56,7 @@ class _MyPainterState extends State<MyPainter>
 
     controller.forward();
 
-    this.particles = List<Particle>.generate(10, (index) {
+    this.particles = List<Particle>.generate(50, (index) {
       var p = Particle();
       p.color = getRandomColor(rgn);
       p.position = Offset(rgn.nextDouble() *maxwidth, rgn.nextDouble()*maxheight);
